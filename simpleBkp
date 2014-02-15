@@ -1,0 +1,44 @@
+#!/bin/bash
+#
+# quick `n dirty bkpTool
+# author: d@stavrovski.net
+#
+# declare some vars
+IN_FILE=${HOME}/.bkp_include
+EX_FILE=${HOME}/.bkp_exclude
+REMOTE_BCKP_DIR=/media/backups
+HOST_NAME=$(hostname)
+TODAY=$(date '+%d-%h-%Y') # 09-Jul-2013
+# transfer I/O speed in Kbytes. set to 0 for unlimited
+# or 10000 KB/s (9.7MB/s) so your system stay
+# responsive during backup time
+NET_SPEED=10000
+
+if [[ $# -eq 1 ]] && [[ $1 == 'gen' ]]; then
+	(ls /|while read d; do echo "/$d"; done)
+	exit 0
+fi
+
+# read the config file and start the backup
+for bkpItem in $(cat ${IN_FILE}); do
+
+	mkdir -p "${REMOTE_BCKP_DIR%*/}"/"${HOST_NAME}"/"${TODAY}"/"${bkpItem}"
+	mkdir -p "${REMOTE_BCKP_DIR%*/}"/current/"${HOST_NAME}""${bkpItem}"
+
+	echo "------- start backup: ${bkpItem} ( $(date '+%D--%H:%M:%S') ) -------"
+ 	rsync -apzh --inplace --numeric-ids --bwlimit=${NET_SPEED} \
+	        --stats \
+	        --delete \
+	        --delete-excluded \
+	        --exclude-from=${EX_FILE} \
+	        --force \
+	        --no-i-r \
+ 	       ${bkpItem%*/}/ "${REMOTE_BCKP_DIR%*/}"/current/"${HOST_NAME}""${bkpItem}"
+
+    echo -e "\n------- end backup: ${bkpItem} ( $(date '+%D--%H:%M:%S') ) -------\n\n\n"
+done
+
+# hardlink copy
+cp -al "${REMOTE_BCKP_DIR%*/}"/current/"${HOST_NAME}"/* "${REMOTE_BCKP_DIR%*/}"/"${HOST_NAME}"/"${TODAY}"
+
+exit 0
